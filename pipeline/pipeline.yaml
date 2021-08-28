@@ -1,0 +1,62 @@
+name: $(BuildDefinitionName)_$(date:yyyyMMdd)$(rev:.r)
+
+pool:
+  name: Default
+
+# Don't run against PRs
+pr: none
+
+# Variable group setup in azure devops library
+# NOTE: remember to update the selected secrets for this variable group
+variables:
+  - group: variable-group-azure-keyvault
+
+stages :
+  - stage: Test
+    jobs:
+      - job: AdoTerraformBuild
+        continueOnError: false
+        steps:
+          - task: Bash@3
+            displayName: 'Test Echo'
+            inputs:
+              targetType: inline
+              script: |
+                echo "Testing testing.cloud ADO Agent"
+          - task: TerraformInstaller@0
+            inputs:
+              terraformVersion: 'latest'
+
+          - task: TerraformCLI@0
+            displayName: 'terraform init'
+            inputs:
+                command: 'init'
+                backendType: local
+                workingDirectory: '$(System.DefaultWorkingDirectory)/Terraform/'
+
+          - task: TerraformCLI@0
+            displayName: 'terraform plan'
+            inputs:
+                command: plan
+                environmentServiceName: 'DevOpsII'
+                publishPlanResults: 'test_plan'
+                runAzLogin: true
+                workingDirectory: '$(System.DefaultWorkingDirectory)/Terraform/'
+                commandOptions: '-var-file="$(System.DefaultWorkingDirectory)/Terraform/azure_devops_agent_rg.tfvars"'
+
+          - task: TerraformCLI@0
+            displayName: 'terraform apply'
+            inputs:
+                command: apply
+                environmentServiceName: 'DevOpsII'
+                # indicate az login should be run as part of this command
+                runAzLogin: true
+                workingDirectory: '$(System.DefaultWorkingDirectory)/Terraform/'
+                commandOptions: '-var-file="$(System.DefaultWorkingDirectory)/Terraform/azure_devops_agent_rg.tfvars"'
+
+          # TODO: Add outputs
+          - task: TerraformCLI@0
+            displayName: 'terraform output'
+            inputs:
+                command: output
+                workingDirectory: '$(System.DefaultWorkingDirectory)/Terraform/'
